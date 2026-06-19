@@ -14,14 +14,14 @@ document.body.appendChild(renderer.domElement);
 
 const controls = new OrbitControls(camera, renderer.domElement);
 
-// Road Path (S-shape with descent)
+// Road Path (S-shape with descent) - Sharper turns for more risk
 const points = [
-    new THREE.Vector3(0, 80, 400),    // Início (topo)
-    new THREE.Vector3(0, 70, 300),
-    new THREE.Vector3(80, 50, 150),   // Curva 1 para a direita (descendo)
-    new THREE.Vector3(-80, 20, -50),  // Curva 2 para a esquerda (S)
-    new THREE.Vector3(0, 5, -200),
-    new THREE.Vector3(0, 0, -400)     // Fim (base)
+    new THREE.Vector3(0, 100, 400),    // Início (mais alto)
+    new THREE.Vector3(0, 90, 300),
+    new THREE.Vector3(120, 60, 150),   // Curva 1 mais fechada (Direita)
+    new THREE.Vector3(-120, 30, -50),  // Curva 2 mais fechada (Esquerda)
+    new THREE.Vector3(0, 10, -200),
+    new THREE.Vector3(0, 0, -400)      // Fim
 ];
 
 const curve = new THREE.CatmullRomCurve3(points);
@@ -73,15 +73,14 @@ for (let i = 0; i < pos.count; i++) {
     // Default height: descent
     let height = (worldZ + 400) * 0.1;
 
-    // Hills to block visibility
-    // If we are near the curves, raise the terrain on the inner side
-    // Curve 1 is at Z ~ 150, X ~ 80 (Right turn, inner side is X > 80)
-    if (worldZ > 100 && worldZ < 250 && worldX > 40) {
-        height += 40 * Math.sin((worldZ - 100) / 150 * Math.PI);
+    // Hills to block visibility (High occlusion)
+    // Curve 1 (Right turn, inner side is X > some_threshold)
+    if (worldZ > 100 && worldZ < 250 && worldX > 30) {
+        height += 70 * Math.sin((worldZ - 100) / 150 * Math.PI);
     }
-    // Curve 2 is at Z ~ -50, X ~ -80 (Left turn, inner side is X < -80)
-    if (worldZ > -150 && worldZ < 50 && worldX < -40) {
-        height += 45 * Math.sin((worldZ + 150) / 200 * Math.PI);
+    // Curve 2 (Left turn, inner side is X < some_threshold)
+    if (worldZ > -150 && worldZ < 50 && worldX < -30) {
+        height += 70 * Math.sin((worldZ + 150) / 200 * Math.PI);
     }
 
     // General noise
