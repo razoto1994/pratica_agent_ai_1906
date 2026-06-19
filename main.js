@@ -73,12 +73,16 @@ for (let i = 0; i < pos.count; i++) {
     // Default height: descent
     let height = (worldZ + 400) * 0.1;
 
-    // Hills to block visibility (High occlusion)
-    // Curve 1 (Right turn, inner side is X > some_threshold)
+    // High relief on margins
+    const distToRoad = Math.abs(worldX - curve.getPointAt((400-worldZ)/800).x);
+    if (distToRoad > 30) {
+        height += (distToRoad - 30) * 0.8;
+    }
+
+    // Additional hills to block visibility (High occlusion)
     if (worldZ > 100 && worldZ < 250 && worldX > 30) {
         height += 70 * Math.sin((worldZ - 100) / 150 * Math.PI);
     }
-    // Curve 2 (Left turn, inner side is X < some_threshold)
     if (worldZ > -150 && worldZ < 50 && worldX < -30) {
         height += 70 * Math.sin((worldZ + 150) / 200 * Math.PI);
     }
@@ -93,7 +97,36 @@ terrainGeometry.computeVertexNormals();
 const terrainMaterial = new THREE.MeshStandardMaterial({
     color: 0x2d4c2d,
     flatShading: true,
-    roughness: 0.8
+    roughness: 0.8,
+    onBeforeCompile: (shader) => {
+        shader.uniforms.contourEquidistance = { value: 2.0 };
+        shader.fragmentShader = `
+            uniform float contourEquidistance;
+            varying vec3 vWorldPosition;
+            ${shader.fragmentShader}
+        `.replace(
+            '#include <common>',
+            '#include <common>\nvarying vec3 vWorldPosition;'
+        ).replace(
+            '#include <color_fragment>',
+            `
+            #include <color_fragment>
+            float dist = abs(fract(vWorldPosition.y / contourEquidistance + 0.5) - 0.5) / fwidth(vWorldPosition.y / contourEquidistance);
+            float line = 1.0 - smoothstep(0.0, 1.5, dist);
+            diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.0, 0.0, 0.0), line * 0.5);
+            `
+        );
+        shader.vertexShader = shader.vertexShader.replace(
+            '#include <common>',
+            '#include <common>\nvarying vec3 vWorldPosition;'
+        ).replace(
+            '#include <worldpos_vertex>',
+            `
+            #include <worldpos_vertex>
+            vWorldPosition = (modelMatrix * vec4(transformed, 1.0)).xyz;
+            `
+        );
+    }
 });
 const terrain = new THREE.Mesh(terrainGeometry, terrainMaterial);
 terrain.rotation.x = -Math.PI / 2;
@@ -146,8 +179,15 @@ sunLight.shadow.mapSize.width = 2048;
 sunLight.shadow.mapSize.height = 2048;
 scene.add(sunLight);
 
-// Driver's Perspective Setup
-let driverMode = false;
+// Perspective vs Orthographic (Plan View)
+const aspect = window.innerWidth / window.innerHeight;
+const d = 500;
+const orthoCamera = new THREE.OrthographicCamera(-d * aspect, d * aspect, d, -d, 1, 2000);
+orthoCamera.position.set(0, 1000, 0);
+orthoCamera.lookAt(0, 0, 0);
+
+// View Modes
+let viewMode = 'orbit'; // 'orbit', 'driver', 'plan'
 let progress = 0;
 
 camera.position.set(0, 120, 500);
@@ -167,10 +207,20 @@ uiContainer.style.gap = '10px';
 uiContainer.style.zIndex = '100';
 document.body.appendChild(uiContainer);
 
-const btn = document.createElement('button');
-btn.innerText = 'Alternar Vista: Motorista / Órbita';
-btn.style.padding = '10px';
-uiContainer.appendChild(btn);
+const btnOrbit = document.createElement('button');
+btnOrbit.innerText = 'Vista: Órbita';
+btnOrbit.style.padding = '10px';
+uiContainer.appendChild(btnOrbit);
+
+const btnDriver = document.createElement('button');
+btnDriver.innerText = 'Vista: Motorista';
+btnDriver.style.padding = '10px';
+uiContainer.appendChild(btnDriver);
+
+const btnPlan = document.createElement('button');
+btnPlan.innerText = 'Vista: Planta (Curvas de Nível)';
+btnPlan.style.padding = '10px';
+uiContainer.appendChild(btnPlan);
 
 const speedLabel = document.createElement('div');
 speedLabel.innerText = 'Velocidade:';
@@ -191,19 +241,27 @@ speedSlider.oninput = (e) => {
     speed = parseFloat(e.target.value);
 };
 
-btn.onclick = () => {
-    driverMode = !driverMode;
-    controls.enabled = !driverMode;
-    if (!driverMode) {
-        camera.position.set(0, 120, 500);
-        camera.lookAt(0, 50, 0);
-    }
+btnOrbit.onclick = () => {
+    viewMode = 'orbit';
+    controls.enabled = true;
+    camera.position.set(0, 120, 500);
+    camera.lookAt(0, 50, 0);
+};
+
+btnDriver.onclick = () => {
+    viewMode = 'driver';
+    controls.enabled = false;
+};
+
+btnPlan.onclick = () => {
+    viewMode = 'plan';
+    controls.enabled = false;
 };
 
 function animate() {
     requestAnimationFrame(animate);
 
-    if (driverMode) {
+    if (viewMode === 'driver') {
         progress += speed;
         if (progress > 1) progress = 0;
 
@@ -212,11 +270,13 @@ function animate() {
 
         camera.position.set(pos.x, pos.y + 2, pos.z);
         camera.lookAt(lookAtPos.x, lookAtPos.y + 2, lookAtPos.z);
+        renderer.render(scene, camera);
+    } else if (viewMode === 'plan') {
+        renderer.render(scene, orthoCamera);
     } else {
         controls.update();
+        renderer.render(scene, camera);
     }
-
-    renderer.render(scene, camera);
 }
 animate();
 
