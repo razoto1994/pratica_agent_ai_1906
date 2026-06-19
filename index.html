@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulação de Segurança Viária - Rodovia em S</title>
+    <style>
+        body { margin: 0; overflow: hidden; font-family: sans-serif; }
+        #info {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            max-width: 300px;
+            pointer-events: none;
+        }
+        #controls {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255,255,255,0.8);
+            padding: 10px;
+            border-radius: 5px;
+        }
+        h1 { font-size: 16px; margin: 0 0 10px 0; }
+        p { font-size: 14px; margin: 5px 0; }
+    </style>
+</head>
+<body>
+    <div id="info">
+        <h1>Simulação de Risco Viário</h1>
+        <p><strong>Cenário:</strong> Curva em S com relevo descendente.</p>
+        <p><strong>Fatores de Risco:</strong></p>
+        <ul>
+            <li>Falta de visibilidade do fim da curva.</li>
+            <li>Declive acentuado (aumento de velocidade).</li>
+            <li>Vegetação obstruindo a visão interna.</li>
+        </ul>
+    </div>
+    <div id="controls">
+        Use o mouse para rotacionar (Orbit) e Scroll para Zoom.
+    </div>
+    <script type="module" src="/main.js"></script>
+</body>
+</html>
