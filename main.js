@@ -7,7 +7,7 @@ scene.background = new THREE.Color(0x87ceeb);
 scene.fog = new THREE.Fog(0x87ceeb, 150, 600);
 
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 2000);
-const renderer = new THREE.WebGLRenderer({ antialias: true });
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true;
 document.body.appendChild(renderer.domElement);
@@ -74,7 +74,9 @@ for (let i = 0; i < pos.count; i++) {
     let height = (worldZ + 400) * 0.1;
 
     // High relief on margins
-    const distToRoad = Math.abs(worldX - curve.getPointAt((400-worldZ)/800).x);
+    const t_road = THREE.MathUtils.clamp((400 - worldZ) / 800, 0, 1);
+    const roadPos = curve.getPointAt(t_road);
+    const distToRoad = Math.abs(worldX - roadPos.x);
     if (distToRoad > 30) {
         height += (distToRoad - 30) * 0.8;
     }
@@ -95,7 +97,7 @@ for (let i = 0; i < pos.count; i++) {
 terrainGeometry.computeVertexNormals();
 
 const terrainMaterial = new THREE.MeshStandardMaterial({
-    color: 0x2d4c2d,
+    color: 0x4a7c4a, // Brighter green
     flatShading: true,
     roughness: 0.8,
     onBeforeCompile: (shader) => {
@@ -111,9 +113,12 @@ const terrainMaterial = new THREE.MeshStandardMaterial({
             '#include <color_fragment>',
             `
             #include <color_fragment>
-            float dist = abs(fract(vWorldPosition.y / contourEquidistance + 0.5) - 0.5) / fwidth(vWorldPosition.y / contourEquidistance);
-            float line = 1.0 - smoothstep(0.0, 1.5, dist);
-            diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.0, 0.0, 0.0), line * 0.5);
+            // Contour lines with fixed world-space thickness (approx 0.2m)
+            float val = vWorldPosition.y / contourEquidistance;
+            float thickness = 0.2;
+            float dist = abs(fract(val + 0.5) - 0.5) * contourEquidistance;
+            float line = 1.0 - smoothstep(thickness * 0.5, thickness * 1.5, dist);
+            diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.0, 0.0, 0.0), line * 0.7);
             `
         );
         shader.vertexShader = shader.vertexShader.replace(
@@ -169,10 +174,10 @@ for (let i = 0; i < 150; i++) {
 }
 
 // Lighting
-const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.6); // Increased ambient
 scene.add(ambientLight);
 
-const sunLight = new THREE.DirectionalLight(0xffffff, 1.0);
+const sunLight = new THREE.DirectionalLight(0xffffff, 1.2); // Increased sun
 sunLight.position.set(200, 300, 100);
 sunLight.castShadow = true;
 sunLight.shadow.mapSize.width = 2048;
@@ -262,6 +267,9 @@ function animate() {
     requestAnimationFrame(animate);
 
     if (viewMode === 'driver') {
+        scene.fog.near = 10;
+        scene.fog.far = 300;
+
         progress += speed;
         if (progress > 1) progress = 0;
 
@@ -272,8 +280,12 @@ function animate() {
         camera.lookAt(lookAtPos.x, lookAtPos.y + 2, lookAtPos.z);
         renderer.render(scene, camera);
     } else if (viewMode === 'plan') {
+        scene.fog.near = 2000; // Effectively disable fog for plan view
+        scene.fog.far = 5000;
         renderer.render(scene, orthoCamera);
     } else {
+        scene.fog.near = 150;
+        scene.fog.far = 1000;
         controls.update();
         renderer.render(scene, camera);
     }
